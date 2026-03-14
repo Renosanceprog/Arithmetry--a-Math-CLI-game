@@ -1,0 +1,552 @@
+//v1 of program
+#include <stdio.h>
+#include <string.h>
+#include <conio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define MAX_USERLEN 50
+#define MAX_PASSLEN 20
+#define QUESTIONS 4
+#define min_VALUE 1
+#define max_VALUE 20
+
+typedef struct {
+    int x;
+    int y;
+    char operation;
+    int user_answer;
+    int correct_answer;
+} MathProblem;
+
+typedef struct
+{
+    int Classic;
+    int Addition;
+    int Subtraction;
+    int Multiplication;
+    int Division;
+}Scores;
+
+
+typedef struct Node {
+    int id;
+    char userNames[MAX_USERLEN];
+    char userPasswords[MAX_PASSLEN];
+    Scores userScores;
+    struct Node *next_user;
+}loginInfo;
+
+// game logic functions ==========================
+int start_Game();
+char showGamemodes();
+int rng(int min, int max);
+char rog();
+void getValidXY(int *x, char operation, int *y);
+int findCorrect(int x, char operation, int y);
+void checkWinner(int answer, int correct);
+MathProblem generateProblem(char choice);
+int givePoints(char operation);
+int enterInteger(void);
+
+// login functions ===============================
+int start_Login();
+int showLoginMenu();
+int loginUser();
+int registerUser();
+
+void hidePassword(char *password);
+void saveData();
+void loadData();
+
+// User functions ================================
+int start_Hub();
+int showMenu();
+int showCategoryMenu();
+void showUserStats();
+int getScore(loginInfo user, int category);
+int compareUsers(const void *a, const void *b);
+void showLeaderboard(int category);
+
+// Global variables ==============================
+int score = 0;
+loginInfo *head = NULL; // top of the list
+loginInfo *tail = NULL; // bottom of the list
+loginInfo *current_User = NULL; // the user who succesfully logged in
+int userCount = 0;
+
+// Main Entry ====================================
+int main()
+{
+    srand(time(NULL)); // init rand seed
+    loadData();
+    if (start_Login() == -1) goto programexit;
+    if (start_Hub() == -1) goto programexit;
+    
+    programexit:
+    saveData();
+    return 0;
+}
+
+// game logic functions ==========================
+int start_Game(){
+    char choice  = showGamemodes();
+    int lives = 3;
+    int qs = 1;
+    while (lives > 0)
+    {
+        MathProblem current = generateProblem(choice);
+        printf("lives: %d\nQuestion %d: %d %c %d = ?\n", lives, qs, current.x, current.operation, current.y);
+        printf("Answer: ");
+        current.user_answer = enterInteger();
+        checkWinner(current.user_answer, current.correct_answer);
+        if (current.user_answer != current.correct_answer) lives--;
+        qs++;
+    }
+    showLeaderboard(6);
+}
+char showGamemodes(){
+    printf("===== GAMEMODES ======\n");
+    printf("[1] Classic\n[2] Addition Only\n[3] Subtraction Only\n[4] Multiplication Only\n[5] Division Only\nChoose option: ");
+    while (1)
+    {
+        switch (enterInteger())
+        {
+        case 1: return '?';
+        case 2: return '+';
+        case 3: return '-';
+        case 4: return '*';
+        case 5: return '/';
+        default:
+            printf("Choose a valid option.\n");
+            break;
+        }
+    }
+}
+int rng(int min,  int max){
+    return rand() % (max - min + 1) + min;
+}
+
+char rog(){
+    switch (rng(1,4)) // Fixed the rng range
+    {
+        case 1: return '+';
+        case 2: return '-';
+        case 3: return '*';
+        case 4: return '/';
+    }
+}
+
+void getValidXY(int *x, char operation, int *y)
+{
+    switch (operation)
+    {
+        case '+':
+        case '-':
+            // Both + and - use the same generation rules, so we can stack them!
+            *x = rng(min_VALUE, max_VALUE);
+            *y = rng(min_VALUE, max_VALUE);
+            break;
+        case '*':
+            *x = rng(min_VALUE, max_VALUE);
+            *y = rng(min_VALUE, max_VALUE/2);
+            break;
+        case '/':
+            *y = rng(min_VALUE + 1, max_VALUE); 
+            int temp_answer = rng(1, max_VALUE/1.5);
+            *x = (*y) * temp_answer; 
+            break;
+    }
+}
+
+int findCorrect(int x, char operation, int y){
+    switch (operation)
+    {
+        case '+': return x + y;
+        case '-': return x - y;
+        case '*': return x * y;
+        case '/': return x / y;
+        default: return 0;
+    }
+}
+
+void checkWinner(int answer, int correct){
+    if (answer == correct)
+    {
+        printf("Correct!\n\n");
+        score++;
+    }
+    else
+    {
+        printf("Nice try! Correct answer is %d\n\n", correct);
+    }
+}
+
+int givePoints(char operation){
+    // switch (operation)
+    // {
+    //     case '+': return x + y;
+    //     case '-': return x - y;
+    //     case '*': return x * y;
+    //     case '/': return x / y;
+    //     default: return 0;
+    // }
+}
+
+MathProblem generateProblem(char choice)
+{
+    MathProblem p;
+    if (choice == '?') p.operation = rog();
+    else p.operation = choice;
+    getValidXY(&p.x, p.operation, &p.y);
+    p.correct_answer = findCorrect(p.x, p.operation, p.y);
+    return p;
+}
+
+int enterInteger(void) {
+    int valid = 0, input;
+    do {
+        if (scanf(" %d", &input) != 1) {
+            printf("Invalid input. Enter value: ");
+            int c; while ((c = getchar()) != '\n' && c != EOF);
+            continue;
+        }
+        valid = 1;
+    } while (!valid);
+    return input;
+}
+
+// login functions ===============================
+int start_Login()
+{
+    do
+    {
+        printf("===== REGISTER / LOGIN =====\n");
+        switch (showLoginMenu())
+        {
+        case 1: registerUser(); break;
+        case 2: loginUser(); break;
+        case 3: return -1;
+        default:
+            printf("Choose a valid option\n");
+            break;
+        }
+        
+    } while (current_User == NULL);
+    system("pause");
+    system("cls");
+    return 0;
+}
+
+int showLoginMenu()
+{
+    printf("Current Users = %d\n[1] Register\n[2] Login\n[3] Exit\nChoose Option: ", userCount);
+    int choice = enterInteger();
+    return choice;
+}
+
+int loginUser()
+{
+    if (userCount == 0)
+    {
+        return -1;
+    }
+    
+    int valid = 0;
+    int index = 0;
+    loginInfo *walker = head;
+    // username
+    char tempName[MAX_USERLEN];
+    do
+    {
+        if (valid != 0) printf("\33[1A\33[2K\rUsername not Found! ");
+        printf("Enter username: ");
+        scanf(" %49[^\n]", tempName);
+        while (walker != NULL)
+        {
+            valid = strcmp(walker->userNames, tempName);
+            if (valid == 0) break;
+            walker = walker->next_user;
+        }
+    } while (valid != 0);
+    char tempPass[MAX_PASSLEN];
+    do
+    {
+        if (valid != 0) printf("\33[1A\33[2K\rIncorrect Password! ");
+        printf("Enter Password: ");
+        hidePassword(tempPass);
+            valid = strcmp(walker->userPasswords, tempPass);
+            if (valid == 0) break;
+    } while (valid != 0);
+    current_User = walker;
+    printf("%s succesfully logged in!\n", current_User->userNames);
+    return 0;
+}
+
+int registerUser() 
+{
+    loginInfo *new_user = (loginInfo *)malloc(sizeof(loginInfo));
+    if (new_user == NULL) return -1; // Memory check!
+
+    // IMPORTANT: Clear the memory! 
+    // This sets next_user to NULL and all scores to 0 in one go.
+    memset(new_user, 0, sizeof(loginInfo)); 
+
+    userCount++;
+    new_user->id = userCount;
+
+    printf("Enter username: ");
+    scanf(" %49[^\n]", new_user->userNames);
+
+    char password1[MAX_PASSLEN], password2[MAX_PASSLEN];
+    printf("Enter password: ");
+    hidePassword(password1);
+    
+    // Simple Loop for confirmation
+    int valid = 1;
+    do {
+        printf("Confirm password: ");
+        hidePassword(password2);
+        valid = strcmp(password1, password2);
+        if (valid != 0) printf("Mismatch! Try again.\n");
+    } while (valid != 0);
+
+    strcpy(new_user->userPasswords, password1);
+
+    // Linked List Connection
+    if (head == NULL) {
+        head = new_user;
+        tail = new_user;
+    } else {
+        tail->next_user = new_user;
+        tail = new_user;
+    }
+    tail->next_user = NULL; // Extra safety
+
+    current_User = new_user;
+    printf("%s successfully Registered!\n", new_user->userNames);
+    return 0;
+}
+
+void hidePassword(char *password)
+{
+    int i = 0;
+    char c;
+    // 1. Changed to an infinite loop! 
+    // The ONLY way out is pressing Enter.
+    while (1) 
+    {
+        c = getch();
+        
+        if (c == '\r' || c == '\n')
+        {
+            if (i <= 4) continue; // Enforce minimum length (5 chars)
+            break; // Submit the password
+        }
+        else if (c == 8 || c == 127)
+        {
+            if (i > 0){printf("\b \b"); i--;}
+        }
+        else if (c == 32) continue;
+        else 
+        {
+            // 2. The Brick Wall: Only accept the character if there is room!
+            // If the array is full, we simply ignore the keystroke.
+            if (i < MAX_PASSLEN - 1) 
+            {
+                password[i] = c;
+                printf("*");
+                i++;
+            }
+        }
+    }
+    
+    password[i] = '\0'; 
+    printf("\n");
+}
+
+void saveData()
+{
+    // We open the file regardless. If the list is empty, 
+    // the file becomes empty (which is correct).
+    FILE *pData = fopen("programdata.txt", "w");
+    if (pData == NULL) { 
+        printf("Error opening file\n"); 
+        return;
+    }
+
+    loginInfo *walker = head;
+    while (walker != NULL) {
+        fprintf(pData, "%d,%s,%s,%d,%d,%d,%d,%d\n", 
+                walker->id, 
+                walker->userNames, 
+                walker->userPasswords,
+                walker->userScores.Classic,
+                walker->userScores.Addition,
+                walker->userScores.Subtraction,
+                walker->userScores.Multiplication,
+                walker->userScores.Division);
+        walker = walker->next_user;
+    }
+    
+    fclose(pData);
+    printf("Data saved successfully.\n");
+}
+
+void loadData()
+{
+    userCount = 0;
+    // Temporary variables to hold the scores during reading
+    int id, s1, s2, s3, s4, s5;
+    char username[MAX_USERLEN];
+    char password[MAX_PASSLEN];
+    
+    FILE *pData = fopen("programdata.txt", "r");
+    if(pData == NULL){ 
+        printf("No existing database found. Starting fresh.\n"); 
+        return;
+    }
+
+    // The format string now expects 8 items (3 strings/id + 5 scores)
+    // We use %[^,] for the password too, just in case.
+    while (fscanf(pData, "%d,%[^,],%[^,],%d,%d,%d,%d,%d\n", &id, username, password, &s1, &s2, &s3, &s4, &s5) == 8)
+    {
+        loginInfo *loaded_user = (loginInfo *)malloc(sizeof(loginInfo));
+        userCount++;
+        loaded_user->id = id;
+        strcpy(loaded_user->userNames, username);
+        strcpy(loaded_user->userPasswords, password);
+        
+        // Assigning the loaded scores to the nested struct
+        loaded_user->userScores.Classic = s1;
+        loaded_user->userScores.Addition = s2;
+        loaded_user->userScores.Subtraction = s3;
+        loaded_user->userScores.Multiplication = s4;
+        loaded_user->userScores.Division = s5;
+        if (head == NULL) {
+            head = loaded_user;
+            tail = loaded_user;
+        }
+        else
+        {
+            tail->next_user = loaded_user;
+            tail = loaded_user;
+        }
+        
+    }
+    fclose(pData);
+}
+// User functions ================================
+int start_Hub()
+{
+    while (1)
+    {
+        printf("===== GAME HUB =====\n");
+        switch (showMenu())
+        {
+        case 1: start_Game(); break;
+        case 2: system("cls"); showUserStats(); break;
+        case 3: system("cls"); showLeaderboard(showCategoryMenu()); break;
+        case 4: return -1;
+        default: printf("Choose Valid Option.\n"); break;
+        }
+        system("pause");
+        system("cls");
+    }
+    
+    return 0;
+}
+
+int showMenu()
+{
+    printf("[1] Play\n[2] Show Stats\n[3] Show leaderboard\n[4] Exit\nChoose Option: ");
+    int choice = enterInteger();
+    return choice;
+}
+
+int showCategoryMenu()
+{
+    printf("[1] Classic\n[2] Addition Only\n[3] Subtraction Only\n[4] Multiplication Only\n[5] Division Only\n[6] Overall\n[7] Exit\nChoose Option: ");
+    int choice = enterInteger();
+    system("cls");
+    return choice;
+}
+
+void showUserStats()
+{
+    printf("==== USER STATS ====\n");
+    printf("ID: %02d\n",current_User->id);
+    printf("Username: %s\n\n",current_User->userNames);
+    int overallScore = current_User->userScores.Classic + current_User->userScores.Addition + current_User->userScores.Subtraction + current_User->userScores.Multiplication + current_User->userScores.Division;
+    printf("    -=(Top Scores)=-\n%-16s | %5d\n%-16s | %5d\n%-16s | %5d\n%-16s | %5d\n%-16s | %5d\n%-16s | %5d\n", 
+        "Classic",current_User->userScores.Classic,
+        "Addition",current_User->userScores.Addition,
+        "Subtraction",current_User->userScores.Subtraction,
+        "Multiplication",current_User->userScores.Multiplication,
+        "Division",current_User->userScores.Division, 
+        "Overall",overallScore);
+    return;
+}
+
+int getScore(loginInfo user, int category) {
+    switch(category) {
+        case 1: return user.userScores.Classic;
+        case 2: return user.userScores.Addition;
+        case 3: return user.userScores.Subtraction;
+        case 4: return user.userScores.Multiplication;
+        case 5: return user.userScores.Division;
+        case 6: return user.userScores.Classic + user.userScores.Addition + 
+                       user.userScores.Subtraction + user.userScores.Multiplication + 
+                       user.userScores.Division;
+        default: return 0;
+    }
+}
+
+int current_sort_category = 0;
+
+int compareUsers(const void *a, const void *b) {
+    // 1. Cast the 'void' pointers back to 'loginInfo' pointers
+    // Since we are sorting an array of POINTERS, 'a' is a pointer to a pointer.
+    loginInfo *userA = *(loginInfo **)a;
+    loginInfo *userB = *(loginInfo **)b;
+
+    int scoreA = getScore(*userA, current_sort_category);
+    int scoreB = getScore(*userB, current_sort_category);
+
+    // Return >0 if B should come before A (Descending order)
+    return (scoreB - scoreA); 
+}
+
+void showLeaderboard(int category) {
+    if (head == NULL) return;
+
+    // 1. Prepare the pointer array
+    loginInfo *rankings[userCount];
+    loginInfo *curr = head;
+    for (int i = 0; i < userCount; i++) {
+        rankings[i] = curr;
+        curr = curr->next_user;
+    }
+
+    // 2. set the sort
+    current_sort_category = category;
+    qsort(rankings, userCount, sizeof(loginInfo *), compareUsers);
+
+    // 3. Print the formatted table
+    char *titles[] = {"", "CLASSIC", "ADDITION", "SUBTRACTION", "MULTIPLICATION", "DIVISION", "OVERALL"};
+    
+    printf("\n--- %s LEADERBOARD ---\n", titles[category]);
+    printf("%-4s %-20s %-10s\n", "RANK", "USERNAME", "SCORE");
+    printf("------------------------------------------\n");
+
+    int rank = 1;
+    for (int i = 0; i < 10; i++) {
+        if (i > userCount-1) break;
+        int score = getScore(*(rankings[i]), category);
+        if (score == 0) continue;
+        printf("%-4d %-20s %-10d\n", rank, rankings[i]->userNames, score);
+        rank++;
+    }
+    printf("\n");
+}
+
