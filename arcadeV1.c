@@ -46,7 +46,7 @@ void getValidXY(int *x, char operation, int *y);
 int findCorrect(int x, char operation, int y);
 void checkWinner(int answer, int correct);
 MathProblem generateProblem(char choice);
-int givePoints(char operation);
+int givePoints(char operation, double time);
 int enterInteger(void);
 
 // login functions ===============================
@@ -93,16 +93,22 @@ int start_Game(){
     char choice  = showGamemodes();
     int lives = 3;
     int qs = 1;
+    int score = 0;
     while (lives > 0)
     {
-        MathProblem current = generateProblem(choice);
-        printf("lives: %d\nQuestion %d: %d %c %d = ?\n", lives, qs, current.x, current.operation, current.y);
+        MathProblem curProblem = generateProblem(choice);
+        printf("lives: %d\nQuestion %d: %d %c %d = ?\n", lives, qs, curProblem.x, curProblem.operation, curProblem.y);
         printf("Answer: ");
-        current.user_answer = enterInteger();
-        checkWinner(current.user_answer, current.correct_answer);
-        if (current.user_answer != current.correct_answer) lives--;
+        clock_t start = clock();
+        curProblem.user_answer = enterInteger();
+        clock_t end = clock();
+        double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+        checkWinner(curProblem.user_answer, curProblem.correct_answer);
+        if (curProblem.user_answer != curProblem.correct_answer) lives--;
+        else score += givePoints(curProblem.operation, time_spent);
         qs++;
     }
+    printf("you scored: %d points\n", score);
     showLeaderboard(6);
 }
 char showGamemodes(){
@@ -182,15 +188,19 @@ void checkWinner(int answer, int correct){
     }
 }
 
-int givePoints(char operation){
-    // switch (operation)
-    // {
-    //     case '+': return x + y;
-    //     case '-': return x - y;
-    //     case '*': return x * y;
-    //     case '/': return x / y;
-    //     default: return 0;
-    // }
+int givePoints(char operation, double time){
+    float points = 20;
+    switch (operation)
+    {
+        case '+': points *= 1; break;
+        case '-': points *= 1.2; break;
+        case '*': points *= 1.5; break;
+        case '/': points *= 2; break;
+    }
+    if (time < 3) points *= 1.5;
+    if (time < 10) points *= 1;
+    else points *= 0.45;
+    return (int)points;
 }
 
 MathProblem generateProblem(char choice)
