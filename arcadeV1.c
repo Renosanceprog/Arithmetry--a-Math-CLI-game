@@ -48,7 +48,7 @@ char rog();
 void getValidXY(int *x, char operation, int *y);
 int findCorrect(int x, char operation, int y);
 void checkWinner(int answer, int correct);
-int givePoints(char operation, double time);
+int givePoints(char operation, double time, int streak);
 int saveScore(char choice, int score);
 MathProblem generateProblem(char choice);
 int enterInteger(void);
@@ -70,7 +70,7 @@ int showCategoryMenu();
 void showUserStats();
 int getScore(loginInfo user, int category);
 int compareUsers(const void *a, const void *b);
-void showLeaderboard(int category);
+int showLeaderboard(int category);
 
 // Global variables ==============================
 int score = 0;
@@ -110,16 +110,17 @@ int start_Game(){
         clock_t end = clock();
         time_spent = (double)(end - start) / CLOCKS_PER_SEC;
         checkWinner(curProblem.user_answer, curProblem.correct_answer);
-        if (curProblem.user_answer != curProblem.correct_answer) {lives--; current_User->userScores.Wrongs++; streak = 0;}
-        else {score += givePoints(curProblem.operation, time_spent); current_User->userScores.Corrects++; streak++;
-            if (current_User->userScores.fastest_answer < 0 || time_spent < current_User->userScores.fastest_answer) {current_User->userScores.fastest_answer = time_spent;}}
+        /*User gets it wrong*/ if (curProblem.user_answer != curProblem.correct_answer) {lives--; current_User->userScores.Wrongs++; streak = 0;}
+        /*User gets it Right*/else {score += givePoints(curProblem.operation, time_spent, streak); current_User->userScores.Corrects++; streak++;
+            if (current_User->userScores.fastest_answer == 0.0 || time_spent < current_User->userScores.fastest_answer) current_User->userScores.fastest_answer = time_spent;}
         if (streak > current_User->userScores.Streak) current_User->userScores.Streak = streak;
-        printf("%.2lf\n", time_spent);
+        if (current_User->userScores.fastest_answer == 0.0 || time_spent < current_User->userScores.fastest_answer) printf("NEW FASTEST ANSWER TIME! ", current_User->userScores.fastest_answer);
+        printf("It took you %.2lf seconds to answer this question!\n", time_spent);
         qs++;
         system("pause"); system("cls");
+        if (streak >= 5) printf("%d CORRECT ANSWER STREAK! x%.2f Multiplier!\n", streak, (1 + ((streak - 4) * 0.1)));
     }
     if (saveScore(choice, score)) printf("NEW PERSONAL BEST!\n");
-    if (time_spent > current_User->userScores.fastest_answer) printf("NEW FASTEST ANSWER TIME: %.2lf\n", current_User->userScores.fastest_answer);
     printf("you scored: %d points\n", score);
     showLeaderboard(6);
 }
@@ -200,8 +201,9 @@ void checkWinner(int answer, int correct){
     }
 }
 
-int givePoints(char operation, double time){
+int givePoints(char operation, double time, int streak){
     float points = 20;
+    float streakmulti = 1;
     switch (operation)
     {
         case '+': points *= 1; break;
@@ -212,6 +214,11 @@ int givePoints(char operation, double time){
     if (time < 3) points *= 1.5;
     if (time < 10) points *= 1;
     else points *= 0.45;
+    if (streak >= 5) {
+    int bonus_score = streak - 4; 
+    streakmulti = 1.0f + (bonus_score * 0.1f); 
+    }
+    points *= streakmulti;
     return (int)points;
 }
 
@@ -492,14 +499,14 @@ int start_Hub()
         {
         case 1: start_Game(); break;
         case 2: system("cls"); showUserStats(); break;
-        case 3: system("cls"); showLeaderboard(showCategoryMenu()); break;
+        case 3: system("cls"); if (showLeaderboard(showCategoryMenu()) == -1) goto avoidpause; break;
         case 4: return -1;
         default: printf("Choose Valid Option.\n"); break;
         }
         system("pause");
+        avoidpause:
         system("cls");
     }
-    
     return 0;
 }
 
@@ -512,7 +519,7 @@ int showMenu()
 
 int showCategoryMenu()
 {
-    printf("[1] Classic\n[2] Addition Only\n[3] Subtraction Only\n[4] Multiplication Only\n[5] Division Only\n[6] Overall\n[7] Exit\nChoose Option: ");
+    printf("[1] Classic\n[2] Addition Only\n[3] Subtraction Only\n[4] Multiplication Only\n[5] Division Only\n[6] Overall\n[7] Return to Hub\nChoose Option: ");
     int choice = enterInteger();
     system("cls");
     return choice;
@@ -566,36 +573,40 @@ int compareUsers(const void *a, const void *b) {
     return (scoreB - scoreA); 
 }
 
-void showLeaderboard(int category) {
-    if (head == NULL) return;
-
-    // 1. Prepare the pointer array
-    loginInfo *rankings[userCount];
-    loginInfo *curr = head;
-    for (int i = 0; i < userCount; i++) {
-        rankings[i] = curr;
-        curr = curr->next_user;
-    }
-
-    // 2. set the sort
-    current_sort_category = category;
-    qsort(rankings, userCount, sizeof(loginInfo *), compareUsers);
-
-    // 3. Print the formatted table
-    char *titles[] = {"", "CLASSIC", "ADDITION", "SUBTRACTION", "MULTIPLICATION", "DIVISION", "OVERALL"};
+int showLeaderboard(int category) {
+    if (category == 7) return -1;
+    if (head == NULL) printf("No users Found.\n");
+    else
+    {
+        // 1. Prepare the pointer array
+        loginInfo *rankings[userCount];
+        loginInfo *curr = head;
+        for (int i = 0; i < userCount; i++) {
+            rankings[i] = curr;
+            curr = curr->next_user;
+        }
     
-    printf("\n--- %s LEADERBOARD ---\n", titles[category]);
-    printf("%-4s %-20s %-10s\n", "RANK", "USERNAME", "SCORE");
-    printf("------------------------------------------\n");
-
-    int rank = 1;
-    for (int i = 0; i < 10; i++) {
-        if (i > userCount-1) break;
-        int score = getScore(*(rankings[i]), category);
-        if (score == 0) continue;
-        printf("%-4d %-20s %-10d\n", rank, rankings[i]->userNames, score);
-        rank++;
+        // 2. set the sort
+        current_sort_category = category;
+        qsort(rankings, userCount, sizeof(loginInfo *), compareUsers);
+    
+        // 3. Print the formatted table
+        char *titles[] = {"", "CLASSIC", "ADDITION", "SUBTRACTION", "MULTIPLICATION", "DIVISION", "OVERALL"};
+        
+        printf("\n--- %s LEADERBOARD ---\n", titles[category]);
+        printf("%-4s %-20s %-10s\n", "RANK", "USERNAME", "SCORE");
+        printf("------------------------------------------\n");
+    
+        int rank = 1;
+        for (int i = 0; i < 10; i++) {
+            if (i > userCount-1) break;
+            int score = getScore(*(rankings[i]), category);
+            if (score == 0) continue;
+            printf("%-4d %-20s %-10d\n", rank, rankings[i]->userNames, score);
+            rank++;
+        }
     }
     printf("\n");
+    return 0;
 }
 
