@@ -45,12 +45,12 @@ int start_Game();
 char showGamemodes();
 int rng(int min, int max);
 char rog();
-void getValidXY(int *x, char operation, int *y);
+void getValidXY(int *x, char operation, int *y, int diffRange);
 int findCorrect(int x, char operation, int y);
 void checkWinner(int answer, int correct);
 int givePoints(char operation, double time, int streak);
 int saveScore(char choice, int score);
-MathProblem generateProblem(char choice);
+MathProblem generateProblem(char choice, int qs);
 int enterInteger(void);
 
 // login functions ===============================
@@ -102,7 +102,7 @@ int start_Game(){
     double time_spent;
     while (lives > 0)
     {
-        MathProblem curProblem = generateProblem(choice);
+        MathProblem curProblem = generateProblem(choice, qs);
         printf("lives: %d\nQuestion %d: %d %c %d = ?\n", lives, qs, curProblem.x, curProblem.operation, curProblem.y);
         printf("Answer: ");
         clock_t start = clock();
@@ -110,15 +110,16 @@ int start_Game(){
         clock_t end = clock();
         time_spent = (double)(end - start) / CLOCKS_PER_SEC;
         checkWinner(curProblem.user_answer, curProblem.correct_answer);
-        /*User gets it wrong*/ if (curProblem.user_answer != curProblem.correct_answer) {lives--; current_User->userScores.Wrongs++; streak = 0;}
-        /*User gets it Right*/else {score += givePoints(curProblem.operation, time_spent, streak); current_User->userScores.Corrects++; streak++;
-            if (current_User->userScores.fastest_answer == 0.0 || time_spent < current_User->userScores.fastest_answer) current_User->userScores.fastest_answer = time_spent;}
+        if (curProblem.user_answer != curProblem.correct_answer) {lives--; current_User->userScores.Wrongs++; streak = 0;}  /*User gets it wrong*/
+        else {score += givePoints(curProblem.operation, time_spent, streak); current_User->userScores.Corrects++; streak++; /*User gets it Right*/
+            if (current_User->userScores.fastest_answer == 0.0 || time_spent < current_User->userScores.fastest_answer) 
+                {current_User->userScores.fastest_answer = time_spent; printf("NEW FASTEST ANSWER TIME! ", current_User->userScores.fastest_answer);}}
         if (streak > current_User->userScores.Streak) current_User->userScores.Streak = streak;
-        if (current_User->userScores.fastest_answer == 0.0 || time_spent < current_User->userScores.fastest_answer) printf("NEW FASTEST ANSWER TIME! ", current_User->userScores.fastest_answer);
         printf("It took you %.2lf seconds to answer this question!\n", time_spent);
         qs++;
         system("pause"); system("cls");
         if (streak >= 5) printf("%d CORRECT ANSWER STREAK! x%.2f Multiplier!\n", streak, (1 + ((streak - 4) * 0.1)));
+        int c; while ((c = getchar()) != '\n' && c != EOF);
     }
     if (saveScore(choice, score)) printf("NEW PERSONAL BEST!\n");
     printf("you scored: %d points\n", score);
@@ -156,23 +157,23 @@ char rog(){
     }
 }
 
-void getValidXY(int *x, char operation, int *y)
+void getValidXY(int *x, char operation, int *y, int diffRange)
 {
     switch (operation)
     {
         case '+':
         case '-':
             // Both + and - use the same generation rules, so we can stack them!
-            *x = rng(min_VALUE, max_VALUE);
-            *y = rng(min_VALUE, max_VALUE);
+            *x = rng(min_VALUE+(diffRange/2), max_VALUE+diffRange);
+            *y = rng(min_VALUE+(diffRange/2), max_VALUE+diffRange);
             break;
         case '*':
-            *x = rng(min_VALUE, max_VALUE);
-            *y = rng(min_VALUE, max_VALUE/2);
+            *x = rng(min_VALUE+(diffRange/2), max_VALUE+diffRange);
+            *y = rng(min_VALUE+(diffRange/2), (max_VALUE+diffRange)/2);
             break;
         case '/':
-            *y = rng(min_VALUE + 1, max_VALUE); 
-            int temp_answer = rng(1, max_VALUE/1.5);
+            *y = rng(min_VALUE+(diffRange/2) + 1, max_VALUE+diffRange); 
+            int temp_answer = rng(1, (max_VALUE+diffRange)/1.5);
             *x = (*y) * temp_answer; 
             break;
     }
@@ -237,12 +238,13 @@ int saveScore(char choice, int score)
     else return 0;
 }
 
-MathProblem generateProblem(char choice)
+MathProblem generateProblem(char choice, int qs)
 {
     MathProblem p;
     if (choice == '?') p.operation = rog();
     else p.operation = choice;
-    getValidXY(&p.x, p.operation, &p.y);
+    int diffRange = (qs / 10) * 5;
+    getValidXY(&p.x, p.operation, &p.y, diffRange);
     p.correct_answer = findCorrect(p.x, p.operation, p.y);
     return p;
 }
