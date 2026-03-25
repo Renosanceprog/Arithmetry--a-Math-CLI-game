@@ -19,13 +19,16 @@ typedef struct {
     int correct_answer;
 } MathProblem;
 
-typedef struct
-{
+typedef struct {
     int Classic;
     int Addition;
     int Subtraction;
     int Multiplication;
     int Division;
+    int Corrects;
+    int Wrongs;
+    int Streak;
+    double fastest_answer;
 }Scores;
 
 
@@ -45,8 +48,9 @@ char rog();
 void getValidXY(int *x, char operation, int *y);
 int findCorrect(int x, char operation, int y);
 void checkWinner(int answer, int correct);
-MathProblem generateProblem(char choice);
 int givePoints(char operation, double time);
+int saveScore(char choice, int score);
+MathProblem generateProblem(char choice);
 int enterInteger(void);
 
 // login functions ===============================
@@ -82,7 +86,7 @@ int main()
     loadData();
     if (start_Login() == -1) goto programexit;
     if (start_Hub() == -1) goto programexit;
-    
+
     programexit:
     saveData();
     return 0;
@@ -94,6 +98,8 @@ int start_Game(){
     int lives = 3;
     int qs = 1;
     int score = 0;
+    int streak = 0;
+    double time_spent;
     while (lives > 0)
     {
         MathProblem curProblem = generateProblem(choice);
@@ -102,12 +108,18 @@ int start_Game(){
         clock_t start = clock();
         curProblem.user_answer = enterInteger();
         clock_t end = clock();
-        double time_spent = (double)(end - start) / CLOCKS_PER_SEC;
+        time_spent = (double)(end - start) / CLOCKS_PER_SEC;
         checkWinner(curProblem.user_answer, curProblem.correct_answer);
-        if (curProblem.user_answer != curProblem.correct_answer) lives--;
-        else score += givePoints(curProblem.operation, time_spent);
+        if (curProblem.user_answer != curProblem.correct_answer) {lives--; current_User->userScores.Wrongs++; streak = 0;}
+        else {score += givePoints(curProblem.operation, time_spent); current_User->userScores.Corrects++; streak++;
+            if (current_User->userScores.fastest_answer < 0 || time_spent < current_User->userScores.fastest_answer) {current_User->userScores.fastest_answer = time_spent;}}
+        if (streak > current_User->userScores.Streak) current_User->userScores.Streak = streak;
+        printf("%.2lf\n", time_spent);
         qs++;
+        system("pause"); system("cls");
     }
+    if (saveScore(choice, score)) printf("NEW PERSONAL BEST!\n");
+    if (time_spent > current_User->userScores.fastest_answer) printf("NEW FASTEST ANSWER TIME: %.2lf\n", current_User->userScores.fastest_answer);
     printf("you scored: %d points\n", score);
     showLeaderboard(6);
 }
@@ -203,6 +215,21 @@ int givePoints(char operation, double time){
     return (int)points;
 }
 
+int saveScore(char choice, int score)
+{
+    int *scorepointer;
+    switch (choice)
+    {
+        case '?': scorepointer = &current_User->userScores.Classic; break;
+        case '+': scorepointer = &current_User->userScores.Addition; break;
+        case '-': scorepointer = &current_User->userScores.Subtraction; break;
+        case '*': scorepointer = &current_User->userScores.Multiplication; break;
+        case '/': scorepointer = &current_User->userScores.Division; break;
+    }
+    if (score > *scorepointer) {*scorepointer = score; return 1;}
+    else return 0;
+}
+
 MathProblem generateProblem(char choice)
 {
     MathProblem p;
@@ -295,7 +322,7 @@ int loginUser()
 
 int registerUser() 
 {
-    loginInfo *new_user = (loginInfo *)malloc(sizeof(loginInfo));
+    loginInfo *new_user = (loginInfo *)calloc(1, sizeof(loginInfo));
     if (new_user == NULL) return -1; // Memory check!
 
     // IMPORTANT: Clear the memory! 
@@ -387,7 +414,7 @@ void saveData()
 
     loginInfo *walker = head;
     while (walker != NULL) {
-        fprintf(pData, "%d,%s,%s,%d,%d,%d,%d,%d\n", 
+        fprintf(pData, "%d,%s,%s,%d,%d,%d,%d,%d,%d,%d,%d,%lf\n", 
                 walker->id, 
                 walker->userNames, 
                 walker->userPasswords,
@@ -395,10 +422,14 @@ void saveData()
                 walker->userScores.Addition,
                 walker->userScores.Subtraction,
                 walker->userScores.Multiplication,
-                walker->userScores.Division);
+                walker->userScores.Division,
+                walker->userScores.Corrects,
+                walker->userScores.Wrongs,
+                walker->userScores.Streak,
+                walker->userScores.fastest_answer);
         walker = walker->next_user;
+        tail->next_user = NULL;
     }
-    
     fclose(pData);
     printf("Data saved successfully.\n");
 }
@@ -407,7 +438,8 @@ void loadData()
 {
     userCount = 0;
     // Temporary variables to hold the scores during reading
-    int id, s1, s2, s3, s4, s5;
+    int id, s1, s2, s3, s4, s5, c, w, strk;
+    double fsttm;
     char username[MAX_USERLEN];
     char password[MAX_PASSLEN];
     
@@ -419,7 +451,7 @@ void loadData()
 
     // The format string now expects 8 items (3 strings/id + 5 scores)
     // We use %[^,] for the password too, just in case.
-    while (fscanf(pData, "%d,%[^,],%[^,],%d,%d,%d,%d,%d\n", &id, username, password, &s1, &s2, &s3, &s4, &s5) == 8)
+    while (fscanf(pData, "%d,%[^,],%[^,],%d,%d,%d,%d,%d,%d,%d,%d,%lf\n", &id, username, password, &s1, &s2, &s3, &s4, &s5, &c, &w, &strk, &fsttm) == 12)
     {
         loginInfo *loaded_user = (loginInfo *)malloc(sizeof(loginInfo));
         userCount++;
@@ -433,6 +465,10 @@ void loadData()
         loaded_user->userScores.Subtraction = s3;
         loaded_user->userScores.Multiplication = s4;
         loaded_user->userScores.Division = s5;
+        loaded_user->userScores.Corrects = c;
+        loaded_user->userScores.Wrongs = w;
+        loaded_user->userScores.Streak = strk;
+        loaded_user->userScores.fastest_answer = fsttm;
         if (head == NULL) {
             head = loaded_user;
             tail = loaded_user;
@@ -487,14 +523,17 @@ void showUserStats()
     printf("==== USER STATS ====\n");
     printf("ID: %02d\n",current_User->id);
     printf("Username: %s\n\n",current_User->userNames);
+    if (current_User->userScores.Wrongs != 0) printf("Corrects: %2d\nWrongs: %4d\nC:W Ratio: %.3f\n",current_User->userScores.Corrects, current_User->userScores.Wrongs, (current_User->userScores.Corrects / (float)current_User->userScores.Wrongs));
+    printf("Highest Streak: %d questions\n",current_User->userScores.Streak);
+    if (current_User->userScores.fastest_answer != 0) printf("Fastest time took to answer question: %.2lf seconds\n\n",current_User->userScores.fastest_answer);
     int overallScore = current_User->userScores.Classic + current_User->userScores.Addition + current_User->userScores.Subtraction + current_User->userScores.Multiplication + current_User->userScores.Division;
-    printf("    -=(Top Scores)=-\n%-16s | %5d\n%-16s | %5d\n%-16s | %5d\n%-16s | %5d\n%-16s | %5d\n%-16s | %5d\n", 
-        "Classic",current_User->userScores.Classic,
-        "Addition",current_User->userScores.Addition,
-        "Subtraction",current_User->userScores.Subtraction,
-        "Multiplication",current_User->userScores.Multiplication,
-        "Division",current_User->userScores.Division, 
-        "Overall",overallScore);
+    printf("    -=(Top Scores)=-");
+    printf("\n%-16s | %5d","Classic",current_User->userScores.Classic);
+    printf("\n%-16s | %5d","Addition",current_User->userScores.Addition);
+    printf("\n%-16s | %5d","Subtraction",current_User->userScores.Subtraction);
+    printf("\n%-16s | %5d","Multiplication",current_User->userScores.Multiplication);
+    printf("\n%-16s | %5d","Division",current_User->userScores.Division);
+    printf("\n%-16s | %5d\n","Overall",overallScore);
     return;
 }
 
