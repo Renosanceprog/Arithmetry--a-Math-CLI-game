@@ -12,6 +12,15 @@
 #define max_VALUE 20
 
 typedef struct {
+    char choice;
+    int lives;
+    int qs;
+    int score;
+    int streak;
+    double time_spent;
+} GameState;
+
+typedef struct {
     int x,y,z;
     char operation, operation2;
     int user_answer;
@@ -42,6 +51,8 @@ typedef struct Node {
 
 // game logic functions ==========================
 int start_Game();
+void ask_Question(GameState *state, MathProblem *curProblem);
+void process_Answer(GameState *state, MathProblem *curProblem);
 char showGamemodes();
 int rng(int min, int max);
 char rog();
@@ -97,45 +108,62 @@ int main()
 
 // game logic functions ==========================
 int start_Game(){
-    char choice  = showGamemodes();
-    int lives = 3;
-    int qs = 1;
-    int score = 0;
-    int streak = 0;
-    double time_spent;
-    while (lives > 0)
+    GameState state = {showGamemodes(), 3, 1, 0, 0, 0};
+    while (state.lives > 0)
     {
         MathProblem curProblem;
-        if (qs % 10 == 0 && qs != 0) {
-            curProblem = generateBossProblem(choice, qs);
-            printf("lives: %d\n!!! BOSS QUESTION !!!\n", lives);
-            printf("Solve: %d %c %d %c %d = ", curProblem.x, curProblem.operation, curProblem.y, curProblem.operation2, curProblem.z);
+        ask_Question(&state, &curProblem);
+        process_Answer(&state, &curProblem);
+        system("pause"); system("cls");
+        if (state.streak >= 5) printf("%d CORRECT ANSWER STREAK! x%.2f Multiplier!\n", state.streak, (1 + ((state.streak - 4) * 0.1)));
+        int c; while ((c = getchar()) != '\n' && c != EOF);
+    }
+    if (saveScore(state.choice, state.score)) printf("NEW PERSONAL BEST!\n");
+    printf("you scored: %d points\n", state.score);
+    showLeaderboard(6);
+}
+void ask_Question(GameState *state, MathProblem *curProblem)
+{
+        if (state->qs % 10 == 0 && state->qs != 0) {
+            *curProblem = generateBossProblem(state->choice, state->qs);
+            printf("lives: %d\n!!! BOSS QUESTION !!!\n", state->lives);
+            printf("Solve: %d %c %d %c %d = ", curProblem->x, curProblem->operation, curProblem->y, curProblem->operation2, curProblem->z);
         } else {
-            curProblem = generateProblem(choice, qs);
-            printf("lives: %d\nQuestion %d: %d %c %d = ?\n", lives, qs, curProblem.x, curProblem.operation, curProblem.y);
+            *curProblem = generateProblem(state->choice, state->qs);
+            printf("lives: %d\nQuestion %d: %d %c %d = ?\n", state->lives, state->qs, curProblem->x, curProblem->operation, curProblem->y);
         }
         printf("Answer: ");
         clock_t start = clock();
-        curProblem.user_answer = enterInteger();
+        curProblem->user_answer = enterInteger();
         clock_t end = clock();
-        time_spent = (double)(end - start) / CLOCKS_PER_SEC;
-        checkWinner(curProblem.user_answer, curProblem.correct_answer);
-        if (curProblem.user_answer != curProblem.correct_answer) {lives--; current_User->userScores.Wrongs++; streak = 0;}  /*User gets it wrong*/
-        else {score += givePoints(curProblem.operation, time_spent, streak, qs); current_User->userScores.Corrects++; streak++; /*User gets it Right*/
-            if (current_User->userScores.fastest_answer == 0.0 || time_spent < current_User->userScores.fastest_answer) 
-                {current_User->userScores.fastest_answer = time_spent; printf("NEW FASTEST ANSWER TIME! ", current_User->userScores.fastest_answer);}}
-        if (streak > current_User->userScores.Streak) current_User->userScores.Streak = streak;
-        printf("It took you %.2lf seconds to answer this question!\n", time_spent);
-        qs++;
-        system("pause"); system("cls");
-        if (streak >= 5) printf("%d CORRECT ANSWER STREAK! x%.2f Multiplier!\n", streak, (1 + ((streak - 4) * 0.1)));
-        int c; while ((c = getchar()) != '\n' && c != EOF);
-    }
-    if (saveScore(choice, score)) printf("NEW PERSONAL BEST!\n");
-    printf("you scored: %d points\n", score);
-    showLeaderboard(6);
+        state->time_spent = (double)(end - start) / CLOCKS_PER_SEC;
 }
-char showGamemodes(){
+void process_Answer(GameState *state, MathProblem *curProblem)
+{
+    checkWinner(curProblem->user_answer, curProblem->correct_answer);
+    if (curProblem->user_answer != curProblem->correct_answer) /*User gets it wrong*/
+    {
+        state->lives--; 
+        current_User->userScores.Wrongs++; 
+        state->streak = 0;
+    }
+    else /*User gets it Right*/
+    {
+        state->score += givePoints(curProblem->operation, state->time_spent, state->streak, state->qs); //calculate the points given for that round
+        current_User->userScores.Corrects++; //add stat for corrects
+        state->streak++; //increase the streak count
+        if (current_User->userScores.fastest_answer == 0.0f || state->time_spent < current_User->userScores.fastest_answer) // checks and updates for fastest time
+        {
+            current_User->userScores.fastest_answer = state->time_spent; 
+            printf("NEW FASTEST ANSWER TIME! ", current_User->userScores.fastest_answer);
+        }
+    }
+    if (state->streak > current_User->userScores.Streak) current_User->userScores.Streak = state->streak; // updates the highest streak achieved by user
+    printf("It took you %.2lf seconds to answer this question!\n", state->time_spent);
+    state->qs++; // increments to the next round
+}
+char showGamemodes()
+{
     printf("===== GAMEMODES ======\n");
     printf("[1] Classic\n[2] Addition Only\n[3] Subtraction Only\n[4] Multiplication Only\n[5] Division Only\nChoose option: ");
     while (1)
@@ -249,10 +277,7 @@ void checkWinner(int answer, int correct){
         printf("Correct!\n\n");
         score++;
     }
-    else
-    {
-        printf("Nice try! Correct answer is %d\n\n", correct);
-    }
+    else printf("Nice try! Correct answer is %d\n\n", correct);
 }
 
 int givePoints(char operation, double time, int streak, int qs){
