@@ -12,11 +12,11 @@
 #define max_VALUE 20
 
 typedef struct {
-    int x;
-    int y;
-    char operation;
+    int x,y,z;
+    char operation, operation2;
     int user_answer;
     int correct_answer;
+    int is_boss;
 } MathProblem;
 
 typedef struct {
@@ -46,11 +46,14 @@ char showGamemodes();
 int rng(int min, int max);
 char rog();
 void getValidXY(int *x, char operation, int *y, int diffRange);
+void getValidBossXYZ(int *x, char oper1, int *y,char oper2, int *z, int diffRange);
 int findCorrect(int x, char operation, int y);
+int findBossCorrect(int x, char op1, int y, char op2, int z);
 void checkWinner(int answer, int correct);
-int givePoints(char operation, double time, int streak);
+int givePoints(char operation, double time, int streak, int qs);
 int saveScore(char choice, int score);
 MathProblem generateProblem(char choice, int qs);
+MathProblem generateBossProblem(char choice, int qs);
 int enterInteger(void);
 
 // login functions ===============================
@@ -102,8 +105,15 @@ int start_Game(){
     double time_spent;
     while (lives > 0)
     {
-        MathProblem curProblem = generateProblem(choice, qs);
-        printf("lives: %d\nQuestion %d: %d %c %d = ?\n", lives, qs, curProblem.x, curProblem.operation, curProblem.y);
+        MathProblem curProblem;
+        if (qs % 10 == 0 && qs != 0) {
+            curProblem = generateBossProblem(choice, qs);
+            printf("lives: %d\n!!! BOSS QUESTION !!!\n", lives);
+            printf("Solve: %d %c %d %c %d = ", curProblem.x, curProblem.operation, curProblem.y, curProblem.operation2, curProblem.z);
+        } else {
+            curProblem = generateProblem(choice, qs);
+            printf("lives: %d\nQuestion %d: %d %c %d = ?\n", lives, qs, curProblem.x, curProblem.operation, curProblem.y);
+        }
         printf("Answer: ");
         clock_t start = clock();
         curProblem.user_answer = enterInteger();
@@ -111,7 +121,7 @@ int start_Game(){
         time_spent = (double)(end - start) / CLOCKS_PER_SEC;
         checkWinner(curProblem.user_answer, curProblem.correct_answer);
         if (curProblem.user_answer != curProblem.correct_answer) {lives--; current_User->userScores.Wrongs++; streak = 0;}  /*User gets it wrong*/
-        else {score += givePoints(curProblem.operation, time_spent, streak); current_User->userScores.Corrects++; streak++; /*User gets it Right*/
+        else {score += givePoints(curProblem.operation, time_spent, streak, qs); current_User->userScores.Corrects++; streak++; /*User gets it Right*/
             if (current_User->userScores.fastest_answer == 0.0 || time_spent < current_User->userScores.fastest_answer) 
                 {current_User->userScores.fastest_answer = time_spent; printf("NEW FASTEST ANSWER TIME! ", current_User->userScores.fastest_answer);}}
         if (streak > current_User->userScores.Streak) current_User->userScores.Streak = streak;
@@ -179,6 +189,49 @@ void getValidXY(int *x, char operation, int *y, int diffRange)
     }
 }
 
+void getValidBossXYZ(int *x, char op1, int *y, char op2, int *z, int diffRange)
+{
+    if ((op2 == '*' || op2 == '/') && (op1 == '+' || op1 == '-'))
+    {
+        getValidXY(y,op2,z,diffRange);
+        *x = rng(min_VALUE+(diffRange/2), max_VALUE+diffRange);
+    }
+    else if ((op1 == '*' || op1 == '/') && (op2 == '+' || op2 == '-'))
+    {
+        getValidXY(x,op1,y,diffRange);
+        *z = rng(min_VALUE+(diffRange/2), max_VALUE+diffRange);
+    }
+    else if ((op1 == '*') && (op2 == '*'))
+    {
+        getValidXY(x,op1,y,diffRange);
+        *z = rng(min_VALUE+(diffRange/2), (max_VALUE+diffRange)/4);
+    }
+    else if ((op1 == '/') && (op2 == '/'))
+    {
+        *z = rng(2, (max_VALUE + diffRange) / 4 + 2); 
+        int temp_answer = rng(1, (max_VALUE + diffRange) / 4 + 2);
+        int op1Eval = (*z) * temp_answer; 
+        *y = rng(2, (max_VALUE + diffRange) / 4 + 2);
+        *x = op1Eval * (*y);
+    }
+    else
+    {
+        getValidXY(x,op1,y,diffRange);
+        *z = rng(min_VALUE+(diffRange/2), max_VALUE+diffRange);
+    }
+}
+
+int findBossCorrect(int x, char op1, int y, char op2, int z) 
+{
+    if ((op2 == '*' || op2 == '/') && (op1 == '+' || op1 == '-')) {
+        int right_side = findCorrect(y, op2, z); 
+        return findCorrect(x, op1, right_side); 
+    } else {
+        int left_side = findCorrect(x, op1, y);
+        return findCorrect(left_side, op2, z);
+    }
+}
+
 int findCorrect(int x, char operation, int y){
     switch (operation)
     {
@@ -202,25 +255,26 @@ void checkWinner(int answer, int correct){
     }
 }
 
-int givePoints(char operation, double time, int streak){
+int givePoints(char operation, double time, int streak, int qs){
     float points = 20;
     float streakmulti = 1;
+    float timeHandicap = ((qs / 10) * 5)/3.5f;
     switch (operation)
     {
         case '+': points *= 1; break;
-        case '-': points *= 1.2; break;
-        case '*': points *= 1.5; break;
+        case '-': points *= 1.2f; break;
+        case '*': points *= 1.5f; break;
         case '/': points *= 2; break;
     }
-    if (time < 3) points *= 1.5;
-    if (time < 10) points *= 1;
-    else points *= 0.45;
+    if (time < 3+timeHandicap) points *= 1.5f;
+    else if (time < 10+timeHandicap) points *= 1;
+    else points *= 0.45f;
     if (streak >= 5) {
     int bonus_score = streak - 4; 
     streakmulti = 1.0f + (bonus_score * 0.1f); 
     }
     points *= streakmulti;
-    return (int)points;
+    return (int)(points + 0.5f);
 }
 
 int saveScore(char choice, int score)
@@ -241,11 +295,30 @@ int saveScore(char choice, int score)
 MathProblem generateProblem(char choice, int qs)
 {
     MathProblem p;
+    p.is_boss = 0;
     if (choice == '?') p.operation = rog();
     else p.operation = choice;
     int diffRange = (qs / 10) * 5;
     getValidXY(&p.x, p.operation, &p.y, diffRange);
     p.correct_answer = findCorrect(p.x, p.operation, p.y);
+    return p;
+}
+
+MathProblem generateBossProblem(char choice, int qs)
+{
+MathProblem p;
+    p.is_boss = 1; // Flag this as a boss question
+    // 1. Roll the operators
+    if (choice == '?'){p.operation = rog(); p.operation2 = rog();}
+    else{p.operation = choice;p.operation2 = choice;}
+    int diffRange = (qs / 20) * 5;
+    // 2. Roll the numbers (You can reuse your getValidXY logic here, 
+    // or just write a quick randomizer for boss numbers)
+    getValidBossXYZ(&p.x, p.operation, &p.y, p.operation2, &p.z, diffRange);
+
+    // 3. Calculate the final answer
+    p.correct_answer = findBossCorrect(p.x, p.operation, p.y, p.operation2, p.z);
+    
     return p;
 }
 
