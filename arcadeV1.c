@@ -4,6 +4,7 @@
 #include <conio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <windows.h>
 
 #define MAX_USERLEN 50
 #define MAX_PASSLEN 20
@@ -11,10 +12,17 @@
 #define min_VALUE 1
 #define max_VALUE 20
 
+#define C_RESET  "\033[0m"
+#define C_GREEN  "\033[1;32m"
+#define C_YELLOW "\033[1;33m"
+#define C_CYAN   "\033[1;36m"
+#define C_RED    "\033[1;31m"
+
 typedef struct {
     char choice;
     int lives;
     int qs;
+    int points_gained;
     int score;
     int streak;
     double time_spent;
@@ -61,8 +69,10 @@ void getValidBossXYZ(int *x, char oper1, int *y,char oper2, int *z, int diffRang
 int findCorrect(int x, char operation, int y);
 int findBossCorrect(int x, char op1, int y, char op2, int z);
 void checkWinner(int answer, int correct);
-int givePoints(char operation, double time, int streak, int qs);
+void printScoreHype(int pointsGained, double timeTaken, int streak);
+int givePoints(int isBoss, char operation, double time, int streak, int qs);
 int saveScore(char choice, int score);
+void revealScore(int score);
 MathProblem generateProblem(char choice, int qs);
 MathProblem generateBossProblem(char choice, int qs);
 int enterInteger(void);
@@ -111,15 +121,19 @@ int start_Game(){
     GameState state = {showGamemodes(), 3, 1, 0, 0, 0};
     while (state.lives > 0)
     {
+        if (state.streak >= 5) printf("%d CORRECT ANSWER STREAK! x%.2f Multiplier!\n", state.streak, (1 + ((state.streak - 4) * 0.1)));
+        if (state.qs > 1) printScoreHype(state.points_gained, state.time_spent ,state.streak);
         MathProblem curProblem;
         ask_Question(&state, &curProblem);
         process_Answer(&state, &curProblem);
+        printf("It took you %.2lf seconds to answer this question!\n", state.time_spent);
         system("pause"); system("cls");
-        if (state.streak >= 5) printf("%d CORRECT ANSWER STREAK! x%.2f Multiplier!\n", state.streak, (1 + ((state.streak - 4) * 0.1)));
         int c; while ((c = getchar()) != '\n' && c != EOF);
+        state.qs++; // increments to the next round
     }
+    system("cls");
     if (saveScore(state.choice, state.score)) printf("NEW PERSONAL BEST!\n");
-    printf("you scored: %d points\n", state.score);
+    revealScore(state.score);
     showLeaderboard(6);
 }
 void ask_Question(GameState *state, MathProblem *curProblem)
@@ -149,7 +163,8 @@ void process_Answer(GameState *state, MathProblem *curProblem)
     }
     else /*User gets it Right*/
     {
-        state->score += givePoints(curProblem->operation, state->time_spent, state->streak, state->qs); //calculate the points given for that round
+        state->points_gained= givePoints(curProblem->is_boss,curProblem->operation, state->time_spent, state->streak, state->qs); //calculate the points given for that round
+        state->score += state->points_gained;
         current_User->userScores.Corrects++; //add stat for corrects
         state->streak++; //increase the streak count
         if (current_User->userScores.fastest_answer == 0.0f || state->time_spent < current_User->userScores.fastest_answer) // checks and updates for fastest time
@@ -159,8 +174,6 @@ void process_Answer(GameState *state, MathProblem *curProblem)
         }
     }
     if (state->streak > current_User->userScores.Streak) current_User->userScores.Streak = state->streak; // updates the highest streak achieved by user
-    printf("It took you %.2lf seconds to answer this question!\n", state->time_spent);
-    state->qs++; // increments to the next round
 }
 char showGamemodes()
 {
@@ -280,7 +293,36 @@ void checkWinner(int answer, int correct){
     else printf("Nice try! Correct answer is %d\n\n", correct);
 }
 
-int givePoints(char operation, double time, int streak, int qs){
+void printScoreHype(int pointsGained, double timeTaken, int streak) 
+{
+    printf("\n"); // Give it some breathing room
+
+    // Tier 1: The "God Gamer" (Fast AND High Streak)
+    if (timeTaken <= 3.0 && streak >= 5) {
+        printf(C_YELLOW "  \xDA\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xBF \n");
+        printf("  \xB3  GODLIKE COMBO!  \xB3 \n");
+        printf("  \xC0\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xC4\xD9 \n");
+        printf("    +" C_RED "%d" C_YELLOW " POINTS!!! \n" C_RESET, pointsGained);
+    }
+    // Tier 2: The "Speed Demon" (Just fast)
+    else if (timeTaken <= 3.0 && pointsGained != 0) {
+        printf(C_CYAN "  >>> QUICK DRAW! <<< \n");
+        printf("      +%d PTS \n" C_RESET, pointsGained);
+    }
+    // Tier 3: The "Consistent" (Just high streak)
+    else if (streak >= 5 && pointsGained != 0) {
+        printf(C_GREEN "  >> STREAK x%d! << \n", streak);
+        printf("     +%d PTS \n" C_RESET, pointsGained);
+    }
+    else if (pointsGained == 0) {
+    }
+    // Tier 4: The "Standard Correct" (Normal)
+    else {
+        printf(C_GREEN "      +%d PTS \n" C_RESET, pointsGained);
+    }
+    printf("\n");
+}
+int givePoints(int isBoss, char operation, double time, int streak, int qs){
     float points = 20;
     float streakmulti = 1;
     float timeHandicap = ((qs / 10) * 5)/3.5f;
@@ -299,6 +341,7 @@ int givePoints(char operation, double time, int streak, int qs){
     streakmulti = 1.0f + (bonus_score * 0.1f); 
     }
     points *= streakmulti;
+    if(isBoss) points *= 10;
     return (int)(points + 0.5f);
 }
 
@@ -315,6 +358,21 @@ int saveScore(char choice, int score)
     }
     if (score > *scorepointer) {*scorepointer = score; return 1;}
     else return 0;
+}
+
+void revealScore(int score)
+{
+    int step;
+    if (score > 50) step = score / 100;
+    else step = score;
+    for (int i = 0; i < score; i++)
+    {
+            printf("\r  [TOTAL SCORE]: " C_YELLOW "%03d" C_RESET, i);
+            fflush(stdout);
+            Sleep(20);
+        i+=step;
+    }
+    printf("\r  [TOTAL SCORE]: " C_YELLOW "%03d" C_RESET "\n", score);
 }
 
 MathProblem generateProblem(char choice, int qs)
@@ -398,7 +456,7 @@ int loginUser()
     
     int valid = 0;
     int index = 0;
-    loginInfo *walker = head;
+    loginInfo *walker;
     // username
     char tempName[MAX_USERLEN];
     do
@@ -406,6 +464,7 @@ int loginUser()
         if (valid != 0) printf("\33[1A\33[2K\rUsername not Found! ");
         printf("Enter username: ");
         scanf(" %49[^\n]", tempName);
+        walker = head;
         while (walker != NULL)
         {
             valid = strcmp(walker->userNames, tempName);
