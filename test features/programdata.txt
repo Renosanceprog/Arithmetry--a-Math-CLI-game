@@ -1,0 +1,5 @@
+0,MathWhiz_99,pass123,50,100,95,90,85
+1,ClassicGamer,pass123,200,10,5,15,5
+2,SlowAndSteady,pass123,80,80,80,80,80
+3,NoobPlayer,pass123,5,10,2,8,1
+4,SubtractionKing,pass123,40,30,150,20,10
