@@ -141,6 +141,7 @@ void drawBorder(const char* color);
 void printCentered(int row, char* text, char* color);
 void drawGameLogos(int screen_id);
 const char* getBorderColor(int streak, int step);
+void bootIntro();
 // Sound Functions ===============================
 DWORD WINAPI SoundThread(LPVOID lpParam);
 void playAudio(SoundID id);
@@ -158,6 +159,7 @@ int main()
     loadData();
     initWindow();
     drawBorder(C_RESET);
+    bootIntro();
     if (start_Login() == -1) goto programexit;
     if (start_Hub() == -1) goto programexit;
 
@@ -1399,6 +1401,54 @@ const char* getBorderColor(int streak, int step) {
     
     return color_buffer;
 }
+void bootIntro()
+{
+            char* logo[] = {
+                "    ___         _ __  __                   __             __",
+                "   /   |  _____(_) /_/ /_  ____ ___  ___  / /________  __/ /",
+                "  / /| | / ___/ / __/ __ \\/ __ `__ \\/ _ \\/ __/ ___/ / / / / ",
+                " / ___ |/ /  / / /_/ / / / / / / / /  __/ /_/ /  / /_/ /_/  ",
+                "/_/  |_/_/  /_/\\__/_/ /_/_/ /_/ /_/\\___/\\__/_/   \\__, (_)   ",
+                "                                                /____/      "
+            };
+                printCentered(4, logo[0],C_RESET);
+                    Beep(294, 375); // D4 (6/16)
+                clearInnerRow(4);
+                printCentered(5, logo[1], C_RESET);
+                    Beep(349, 125); // F4 (2/16)
+                clearInnerRow(5);
+                printCentered(6, logo[2], C_RESET);
+                    Beep(392, 250); // G4 (4/16)
+                
+                Sleep(63);      // Rest (1/16)
+                clearInnerRow(6);
+                printCentered(7, logo[3], C_RESET);
+                    Beep(440, 375); // A4 (6/16)
+                
+                Sleep(63);      // Rest (1/16)
+
+                clearInnerRow(7);
+                printCentered(8, logo[4], C_RESET);
+                    Beep(349, 125); // F4 (2/16)
+                clearInnerRow(8);
+                printCentered(9, logo[5], C_RESET);
+                    Beep(330, 250); // E4 (4/16)
+                
+                Sleep(63);      // Rest (1/16)
+                printCentered(4, logo[0],"\e[38;5;195m");
+                Sleep(1);
+                printCentered(5, logo[1], "\e[38;5;123m");
+                Sleep(1);
+                printCentered(6, logo[2], "\e[38;5;45m");
+                Sleep(1);
+                printCentered(7, logo[3], "\e[38;5;27m");
+                Sleep(1);
+                printCentered(8, logo[4], "\e[38;5;20m");
+                Sleep(1);
+                printCentered(9, logo[5], "\e[38;5;18m");
+                    Beep(294, 375); // D4 (6/16) - The final resolving note
+}
+// Sound functions
 DWORD WINAPI SoundThread(LPVOID lpParam)
 {
     // Safely cast the passed parameter back into our SoundID enum
@@ -1449,7 +1499,7 @@ switch (id)
             Beep(250, 150); Beep(150, 300); // Descending buzz
             break;
         case SFX_BOSS_ALARM: 
-            Beep(300, 350); Beep(150, 300); Beep(300, 350); Beep(150, 300);
+            Beep(300, 350); Beep(300, 300); Beep(300, 350); Beep(300, 300);
             break;
         case SFX_BOSS_DEFEAT:   
             Beep(1046, 100); Beep(784, 100); Beep(523, 100); Beep(784, 100); Beep(1046, 100); Beep(1567, 400); 

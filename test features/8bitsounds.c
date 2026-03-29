@@ -100,7 +100,25 @@ Beep(2093, 70); // C7
 Beep(2637, 150); // E7 (Very high, sparkly peak)
             break;
         case 13:
-
+// MIDI Sequence: 240 BPM
+            // Note Lengths: 1/16th note = ~63ms
+            
+            Beep(294, 375); // D4 (6/16)
+            Beep(349, 125); // F4 (2/16)
+            Beep(392, 250); // G4 (4/16)
+            
+            Sleep(63);      // Rest (1/16)
+            
+            Beep(440, 375); // A4 (6/16)
+            
+            Sleep(63);      // Rest (1/16)
+            
+            Beep(349, 125); // F4 (2/16)
+            Beep(330, 250); // E4 (4/16)
+            
+            Sleep(63);      // Rest (1/16)
+            
+            Beep(294, 375); // D4 (6/16) - The final resolving note
             break;
             
         default:
